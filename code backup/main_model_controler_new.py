@@ -13,8 +13,8 @@ import time
 work_dir = "\\Users\\14534\\Desktop\\Capstone Project\\Jianmu Deng\\classification"
 w = 48
 h = 48
-x_train,y_train,x_test,y_test = load_img.get_img(work_dir,w,h)
-
+#x_healthy,y_healthy,x_diabete,y_diabete = load_img.get_img(work_dir,w,h)
+train_set,test_set = load_img.get_img(work_dir,w,h)
 #mode = ["16_dropout_1","32_dropout_16_1","32_dropout_16_dropout_1"]
 #mode = ["64_dropout_32_16_1",
 #        "64_32_dropout_16_1",
@@ -40,11 +40,10 @@ optimizer = ["adam","rmsprop"]
 models=["DenseNet","ResNet50"]
 # models_=["NASNet","Xception"]#models_=["NASNet","Xception"]
 
-
+img_shape = (w,h,3)
 start = time.time()
-
-mt.run_model(time.time(),"VGG16",500,0.0001,"adam","32_dropout_16_1",0.5,
-             x_train,y_train,x_test,y_test)
+q = 0;
+mt.run_model(time.time(),"VGG16",120,0.0001,"adam","32_dropout_16_1",0.5,img_shape,train_set,test_set)
 ## vgg 16
 #for n in range(3):
 #    for i in range(2):
@@ -69,13 +68,13 @@ mt.run_model(time.time(),"VGG16",500,0.0001,"adam","32_dropout_16_1",0.5,
 #            for j in range(len(dropout_rate)):
 #                for k in range(len(mode)):
 #                    mt.run_model(time.time(),models[m],epchos[0],learning_rate[i],optimizer[n],mode[k],dropout_rate[j],
-#                                    x_train,y_train,x_test,y_test)
+#                                    x_healthy,y_healthy,x_diabete,y_diabete)
 # only for sgd
 #for m in range(len(models)):
 #    for j in range(len(dropout_rate)):
 #        for k in range(len(mode)):
 #            mt.run_model(time.time(),models[m],epchos[0],0.001,"sgd",mode[k],dropout_rate[j],
-#                            x_train,y_train,x_test,y_test)
+#                            x_healthy,y_healthy,x_diabete,y_diabete)
 #for m in range(len(models_)):
 #    for n in range(len(optimizer)):
 #        for i in range(len(learning_rate)):

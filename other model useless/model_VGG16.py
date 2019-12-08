@@ -14,7 +14,7 @@ from keras import optimizers
 from keras.applications.vgg16 import VGG16
 
 #%%
-def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_diabete):
+def run_model(q,n_iter,l_r,opt,transfer_mode,dropout_rate,x_healthy,y_healthy,x_diabete,y_diabete):
 #    print("I am 16")
     K.clear_session()
     #set up training and test dataset
@@ -55,7 +55,7 @@ def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_dia
     n_epochs = n_iter
     batch_size = 30
     validation_split = 0.2
-    dropout = 0.5
+    dropout = dropout_rate
     #%%
     
     ##### Create transfer learning model
@@ -78,13 +78,39 @@ def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_dia
         top_model.add(Dense(32, activation='relu'))
         top_model.add(Dropout(dropout))
         top_model.add(Dense(16, activation='relu'))
-    else:
+    elif transfer_mode is "32_dropout_16_dropout_1":
         base_model_name = "vgg16_32_dropout_16_dropout_1"
         top_model.add(Dense(32, activation='relu'))
         top_model.add(Dropout(dropout))
         top_model.add(Dense(16, activation='relu'))
         top_model.add(Dropout(dropout))
-        
+    elif transfer_mode is "64_dropout_32_16_1":
+        base_model_name = "vgg16_64_dropout_32_16_1"
+        top_model.add(Dense(64, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(32, activation='relu'))
+        top_model.add(Dense(16, activation='relu'))
+    elif transfer_mode is "64_32_dropout_16_1":
+        base_model_name = "vgg16_64_32_dropout_16_1"
+        top_model.add(Dense(64, activation='relu'))
+        top_model.add(Dense(32, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(16, activation='relu'))
+    elif transfer_mode is "64_dropout_32_dropout_16_1":
+        base_model_name = "vgg16_64_dropout_32_dropout_16_1"
+        top_model.add(Dense(64, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(32, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(16, activation='relu'))
+    elif transfer_mode is "64_dropout_32_dropout_16_dropout_1":
+        base_model_name = "vgg16_64_dropout_32_dropout_16_dropout_1"
+        top_model.add(Dense(64, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(32, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(16, activation='relu'))
+        top_model.add(Dropout(dropout))
     top_model.add(Dense(1, activation='sigmoid'))
     transfer_model = Model(inputs= base_model.input, outputs= top_model(base_model.output))
     
@@ -102,10 +128,10 @@ def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_dia
     
     if opt=="adam":
         adam = optimizers.Adam(l_r)
-        diabete_model.compile(optimizer = adam,momentum=0.9,
+        diabete_model.compile(optimizer = adam,
                       loss = "binary_crossentropy", metrics = ["accuracy"])
     elif opt=="sgd":
-        sgd = optimizers.SGD(l_r)
+        sgd = optimizers.SGD(l_r,momentum=0.9)
         diabete_model.compile(optimizer = sgd,
                       loss = "binary_crossentropy", metrics = ["accuracy"])
     else:
@@ -131,23 +157,23 @@ def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_dia
     plt.plot(history.history['val_acc'])
     
     preds = diabete_model.evaluate(x = x_test, y = y_test)
-    epochs = "n_epochs="+str(n_epochs)
-    lrs = "learning_rate="+str(l_r)
-    opts = "optimizer="+opt
-    test_eval = "accu"+str(round(preds[1],4))
-    plt.text(n_epochs-30,0.62,opts)
-    plt.text(n_epochs-30,0.6,lrs)
-    plt.text(n_epochs-30,0.58,epochs)
-    plt.text(n_epochs-30,0.66,test_eval)
+#    epochs = "n_epochs="+str(n_epochs)+";"
+    dp ="dropout= "+str(dropout_rate)+";"
+    lrs = "learning_rate= "+str(l_r)+";"
+    opts = "optimizer= "+opt+";"
+    test_eval = "accu= "+str(round(preds[1],4))
+    plt.text(n_epochs-40,0.62,opts)
+    plt.text(n_epochs-40,0.6,lrs)
+    plt.text(n_epochs-40,0.58,dp)
+    plt.text(n_epochs-40,0.66,test_eval)
     
-    plt.title('Model Accuracy of VGG16 in Different Parameters')
+    plt.title('Model Accuracy of VGG 16 in Different Parameters')
     plt.ylabel('Accuracy')
     plt.xlabel('Epoch')
     plt.legend(['Train', 'Cross_validation'], loc='upper left')
-    plt_path = "./opt="+opt+";lr="+str(l_r)+";epoch="+str(n_epochs)+".png"
-    plt.savefig(plt_path)
+    plt_path = "./"+opts+lrs+dp+".png"
     
-#    print(round(preds[1],4))
+    plt.savefig(plt_path)
     history.history={}
 #%%
 #if __name__ == "__main__":

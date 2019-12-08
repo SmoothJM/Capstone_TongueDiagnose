@@ -2,19 +2,20 @@
 
 import os
 #from PIL import Image, ImageOps
+import time
 import matplotlib.pyplot as plt
+import numpy as np
 
 from keras import backend as K
 from keras.models import Sequential
 from keras.layers import Flatten, Dense, Dropout
 from keras.models import Model
 from keras import optimizers
-import numpy as np
-from keras.applications.vgg19 import VGG19
-from keras import callbacks as cb
+from keras.applications.vgg16 import VGG16
+
 #%%
-def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_diabete):
-#    print("I am 19")
+def run_model(q,n_iter,l_r,opt,transfer_mode,dropout_rate,x_healthy,y_healthy,x_diabete,y_diabete):
+#    print("I am 16")
     K.clear_session()
     #set up training and test dataset
     seed_value = 1228+q
@@ -27,6 +28,7 @@ def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_dia
     
     x_test = np.vstack((x_healthy[index_healthy,:,:,:],x_diabete[index_diabete,:,:,:]))
     y_test = np.vstack((y_healthy[index_healthy,:],y_diabete[index_diabete,:]))
+    
     
     x_train = np.vstack((np.delete(x_healthy,index_healthy,0), np.delete(x_diabete,index_diabete,0)))
     y_train = np.vstack((np.delete(y_healthy,index_healthy,0),np.delete(y_diabete,index_diabete,0)))
@@ -48,42 +50,68 @@ def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_dia
     print("Number of training examples: ", n_train)
     print("Number of test examples: ", n_test)
     print(x_train.shape,x_test.shape)
-    
     #%%
+    # parameters
     n_epochs = n_iter
     batch_size = 30
     validation_split = 0.2
-    dropout = 0.5
+    dropout = dropout_rate
     #%%
     
     ##### Create transfer learning model
     shape = x_train.shape[1:4]
     
-    base_model =VGG19(weights='imagenet',
+    base_model =VGG16(weights='imagenet',
                               include_top=False,
-                              input_shape= shape)
+                              input_shape=shape)
             
     
-            
-    top_model = Sequential( )
+    # layers neural
+    top_model = Sequential()
     top_model.add(Flatten(input_shape=base_model.output_shape[1:]))
     if transfer_mode is "16_dropout_1":
-        base_model_name = "vgg19_16_dropout_1"
+        base_model_name = "vgg16_16_dropout_1"
         top_model.add(Dense(16, activation='relu'))
         top_model.add(Dropout(dropout))
     elif transfer_mode is "32_dropout_16_1":
-        base_model_name = "vgg19_32_dropout_16_1"
+        base_model_name = "vgg16_32_dropout_16_1"
         top_model.add(Dense(32, activation='relu'))
         top_model.add(Dropout(dropout))
         top_model.add(Dense(16, activation='relu'))
-    else:
-        base_model_name = "vgg19_32_dropout_16_dropout_1"
+    elif transfer_mode is "32_dropout_16_dropout_1":
+        base_model_name = "vgg16_32_dropout_16_dropout_1"
+        top_model.add(Dense(32, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(16, activation='relu'))
+        top_model.add(Dropout(dropout))
+    elif transfer_mode is "64_dropout_32_16_1":
+        base_model_name = "vgg16_64_dropout_32_16_1"
+        top_model.add(Dense(64, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(32, activation='relu'))
+        top_model.add(Dense(16, activation='relu'))
+    elif transfer_mode is "64_32_dropout_16_1":
+        base_model_name = "vgg16_64_32_dropout_16_1"
+        top_model.add(Dense(64, activation='relu'))
+        top_model.add(Dense(32, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(16, activation='relu'))
+    elif transfer_mode is "64_dropout_32_dropout_16_1":
+        base_model_name = "vgg16_64_dropout_32_dropout_16_1"
+        top_model.add(Dense(64, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(32, activation='relu'))
+        top_model.add(Dropout(dropout))
+        top_model.add(Dense(16, activation='relu'))
+    elif transfer_mode is "64_dropout_32_dropout_16_dropout_1":
+        base_model_name = "vgg16_64_dropout_32_dropout_16_dropout_1"
+        top_model.add(Dense(64, activation='relu'))
+        top_model.add(Dropout(dropout))
         top_model.add(Dense(32, activation='relu'))
         top_model.add(Dropout(dropout))
         top_model.add(Dense(16, activation='relu'))
         top_model.add(Dropout(dropout))
     top_model.add(Dense(1, activation='sigmoid'))
-    
     transfer_model = Model(inputs= base_model.input, outputs= top_model(base_model.output))
     
     n_layer = len(base_model.layers)
@@ -94,8 +122,10 @@ def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_dia
     transfer_model.summary()
     
     #%%
-
+    start = time.time()
+    # optimizer, learning rate
     diabete_model = transfer_model
+    
     if opt=="adam":
         adam = optimizers.Adam(l_r)
         diabete_model.compile(optimizer = adam,
@@ -108,15 +138,16 @@ def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_dia
         rmsprop = optimizers.RMSprop(l_r)
         diabete_model.compile(optimizer = rmsprop,
                       loss = "binary_crossentropy", metrics = ["accuracy"])
-    reduce_lr = cb.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, 
-                                      verbose=0, mode='min')
+    
     history = diabete_model.fit(x = x_train, y = y_train,  
                                 validation_split=validation_split, 
-                                epochs = n_epochs, batch_size = batch_size,
-                                callbacks=[reduce_lr])
+                                epochs = n_epochs, batch_size = batch_size)
         
-    #%% 
-    plot_dir = "\\Users\\14534\\Desktop\\Capstone Project\\Jianmu Deng\\classification\\vgg19\\"+base_model_name+"\\"
+    end = time.time() - start
+    
+    print("time consumes:",end)
+    #%%
+    plot_dir = "\\Users\\14534\\Desktop\\Capstone Project\\Jianmu Deng\\classification\\vgg16\\"+base_model_name+"\\"
     if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
     os.chdir(plot_dir)
@@ -126,21 +157,22 @@ def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_dia
     plt.plot(history.history['val_acc'])
     
     preds = diabete_model.evaluate(x = x_test, y = y_test)
-    epochs = "n_epochs="+str(n_epochs)
-    lrs = "learning_rate="+str(l_r)
-    opts = "optimizer="+opt
-    test_eval = "accu"+str(round(preds[1],4))
-    plt.text(n_epochs-30,0.62,opts)
-    plt.text(n_epochs-30,0.6,lrs)
-    plt.text(n_epochs-30,0.58,epochs)
-    plt.text(n_epochs-30,0.66,test_eval)
+#    epochs = "n_epochs="+str(n_epochs)+";"
+    dp ="dropout= "+str(dropout_rate)+";"
+    lrs = "learning_rate= "+str(l_r)+";"
+    opts = "optimizer= "+opt+";"
+    test_eval = "accu= "+str(round(preds[1],4))
+    plt.text(n_epochs-40,0.62,opts)
+    plt.text(n_epochs-40,0.6,lrs)
+    plt.text(n_epochs-40,0.58,dp)
+    plt.text(n_epochs-40,0.66,test_eval)
     
-    plt.title('Model Accuracy of VGG 19 Transfer Learning')
+    plt.title('Model Accuracy of VGG 16 in Different Parameters')
     plt.ylabel('Accuracy')
     plt.xlabel('Epoch')
     plt.legend(['Train', 'Cross_validation'], loc='upper left')
+    plt_path = "./"+opts+lrs+dp+".png"
     
-    plt_path = "./opt="+opt+";lr="+str(l_r)+";epoch="+str(n_epochs)+".png"
     plt.savefig(plt_path)
     history.history={}
 #%%
@@ -156,6 +188,8 @@ def run_model(q,n_iter,l_r,opt,transfer_mode,x_healthy,y_healthy,x_diabete,y_dia
 #                for k in range(3):
 #                    q = q+1
 #                    run_model(q,epchos[k],learning_rate[j],optimizer[n],mode[i])          
+
+   
 
    
 
